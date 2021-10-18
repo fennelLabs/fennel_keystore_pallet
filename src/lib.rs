@@ -1,59 +1,69 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use crate::dispatch::Vec;
-use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get};
-use frame_system::ensure_signed;
+pub use frame_system::pallet::*;
+pub use frame_support::storage::*;
 
-pub trait Trait: frame_system::Trait {
-	type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
-}
+#[cfg(test)]
+mod mock;
 
-decl_storage! {
-	trait Store for Module<T: Trait> as TemplateModule {
-		IssuedKeys get(fn key): map hasher(blake2_128_concat) Vec<u8> => Vec<u8>;
+#[cfg(test)]
+mod tests;
+
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+
+#[frame_support::pallet]
+pub mod pallet {
+	use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
+	use frame_system::pallet_prelude::*;
+	use frame_support::inherent::Vec;
+
+	#[pallet::config]
+	pub trait Config: frame_system::Config {
+		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 	}
-}
 
-decl_event!(
-	pub enum Event<T>
-	where
-		AccountId = <T as frame_system::Trait>::AccountId,
-	{
-		KeyIssued(Vec<u8>, AccountId),
-		KeyRevoked(Vec<u8>, AccountId),
+	#[pallet::pallet]
+	#[pallet::generate_store(pub(super) trait Store)]
+	pub struct Pallet<T>(_);
+
+	#[pallet::storage]
+	#[pallet::getter(fn key)]
+	pub type IssuedKeys<T: Config> = StorageDoubleMap<_, Blake2_128Concat, T::AccountId, Blake2_128Concat, Vec<u8>, Vec<u8>>;
+
+	#[pallet::event]
+	#[pallet::metadata(T::AccountId = "AccountId")]
+	#[pallet::generate_deposit(pub(super) fn deposit_event)]
+	pub enum Event<T: Config> {
+		KeyIssued(Vec<u8>, T::AccountId),
+		KeyRevoked(Vec<u8>, T::AccountId),
 	}
-);
 
-decl_error! {
-	pub enum Error for Module<T: Trait> {
+	#[pallet::error]
+	pub enum Error<T> {
 		NoneValue,
 		StorageOverflow,
 	}
-}
 
-decl_module! {
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-		type Error = Error<T>;
-
-		fn deposit_event() = default;
-
-		#[weight = 10_000 + T::DbWeight::get().writes(1)]
-		pub fn issue_key(origin, fingerprint: Vec<u8>, hash: Vec<u8>) -> dispatch::DispatchResult {
+	#[pallet::call]
+	impl<T: Config> Pallet<T> {
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn issue_key(origin: OriginFor<T>, fingerprint: Vec<u8>, hash: Vec<u8>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			IssuedKeys::insert(&fingerprint, hash);
+			<IssuedKeys<T>>::insert(&who, &fingerprint, hash);
 
-			Self::deposit_event(RawEvent::KeyIssued(fingerprint, who));
+			Self::deposit_event(Event::KeyIssued(fingerprint, who));
 			Ok(())
 		}
 
-		#[weight = 10_000 + T::DbWeight::get().writes(1)]
-		pub fn revoke_key(origin, key_index: Vec<u8>) -> dispatch::DispatchResult {
+		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
+		pub fn revoke_key(origin: OriginFor<T>, key_index: Vec<u8>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			IssuedKeys::remove(&key_index);
+			<IssuedKeys<T>>::remove(&who, &key_index);
 
-			Self::deposit_event(RawEvent::KeyRevoked(key_index, who));
+			Self::deposit_event(Event::KeyRevoked(key_index, who));
 			Ok(())
 		}
 	}
