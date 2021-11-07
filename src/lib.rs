@@ -18,6 +18,7 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::storage]
+	/// This module's main storage will consist of a StorageDoubleMap connecting addresses to the list of keys they've submitted and not revoked.
 	#[pallet::getter(fn key)]
 	pub type IssuedKeys<T: Config> = StorageDoubleMap<_, Blake2_128Concat, T::AccountId, Blake2_128Concat, Vec<u8>, Vec<u8>>;
 
@@ -25,7 +26,9 @@ pub mod pallet {
 	#[pallet::metadata(T::AccountId = "AccountId")]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
+		/// Announce when an identity has broadcast a new key as an event.
 		KeyIssued(Vec<u8>, T::AccountId),
+		/// Announce when an identity has set a key as revoked.
 		KeyRevoked(Vec<u8>, T::AccountId),
 	}
 
@@ -38,16 +41,18 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn issue_key(origin: OriginFor<T>, fingerprint: Vec<u8>, hash: Vec<u8>) -> DispatchResult {
+		/// After a new key is created, call this extrinsic to announce it to the network.
+		pub fn issue_key(origin: OriginFor<T>, fingerprint: Vec<u8>, location: Vec<u8>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			<IssuedKeys<T>>::insert(&who, &fingerprint, hash);
+			<IssuedKeys<T>>::insert(&who, &fingerprint, location);
 
 			Self::deposit_event(Event::KeyIssued(fingerprint, who));
 			Ok(())
 		}
 
 		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
+		/// If a key needs to be removed from circulation, this extrinsic will handle deleting it.
 		pub fn revoke_key(origin: OriginFor<T>, key_index: Vec<u8>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
