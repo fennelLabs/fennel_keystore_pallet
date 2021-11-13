@@ -40,8 +40,8 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		/// After a new key is created, call this extrinsic to announce it to the network.
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn issue_key(origin: OriginFor<T>, fingerprint: Vec<u8>, location: Vec<u8>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -51,8 +51,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
 		/// If a key needs to be removed from circulation, this extrinsic will handle deleting it.
+		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
 		pub fn revoke_key(origin: OriginFor<T>, key_index: Vec<u8>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
