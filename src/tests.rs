@@ -12,3 +12,12 @@ fn issue_key() {
     });
 }
 
+#[test]
+fn revoke_key() {
+    new_test_ext().execute_with(|| {
+        let mut key_index: Vec<u8> = Vec::new();
+        key_index.push(1);
+        assert_ok!(KeystoreModule::revoke_key(Origin::signed(1), key_index));
+    });
+}
+
